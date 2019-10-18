@@ -8,8 +8,9 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
+using OpenCvSharp;
+using OpenCvSharp.UserInterface;
+using System.Diagnostics;
 
 namespace TFSClientRestful
 {
@@ -17,29 +18,57 @@ namespace TFSClientRestful
     {
         static void Main(string[] args)
         {
-            bool DEBUG_MODE = true;
+            bool DEBUG_MODE = false;
             //var testImage = new Bitmap("cat.jpg");
             //Image testImage = Image.FromFile("cat.jpg");
-            //Bitmap testImage = (Bitmap)Image.FromFile("cat.jpg");             
+            //Bitmap testImage = (Bitmap)Image.FromFile("cat.jpg");       
+            Stopwatch stw = new System.Diagnostics.Stopwatch();
 
-            Bitmap testImage = (Bitmap)Image.FromFile("manypeople.jpg");
+            string fn = "guy.jpg";
+            Bitmap testImage = (Bitmap)Image.FromFile(fn);
             ParseObject res = null;
+            stw.Start();
             if (!DEBUG_MODE){
                 res = TFSRequestRestful(testImage);
             }
             else{
                 res = TestTFSRequestRestful(testImage);
             }
+            stw.Stop();
+
+            Console.WriteLine("END TIME ::"+stw.ElapsedMilliseconds.ToString()+"msec");
+
+            //Mat src = new Mat("manypeople.jpg", ImreadModes.Grayscale);
+            Mat src = Cv2.ImRead(fn, ImreadModes.Color); // ver 2 방식
 
             if (res.NumOfDetect > 0)
             {
                 Console.WriteLine("detect human: {0}", res.NumOfDetect);
+                for(int i=0; i<res.NumOfDetect; i++)
+                {
+                    int x1 = (int)res.BoxList[i].BoxX1;
+                    int y1 = (int)res.BoxList[i].BoxY1;
+                    int x2 = (int)res.BoxList[i].BoxX2;
+                    int y2 = (int)res.BoxList[i].BoxY2;
+                    Cv2.Rectangle(src, new Rect(x1, y1, x2-x1, y2-y1), new Scalar(0, 0, 200), 1);
+                }
+                
 
             }
             else
             {
                 Console.WriteLine("it could not detect human");
             }
+                        
+            Cv2.NamedWindow("tfs");
+            Cv2.ImShow("tfs", src);
+            Cv2.WaitKey(0); // 키입력 대기
+          
+
+            Cv2.DestroyAllWindows();
+
+
+
         }
 
         public static ParseObject TFSRequestRestful(Bitmap bImage)
@@ -49,7 +78,7 @@ namespace TFSClientRestful
             int im_height = bImage.Height;
 
             var httpWebRequest =
-                (HttpWebRequest)WebRequest.Create(ConfigurationManager.AppSettings["ServerHost2"]);
+                (HttpWebRequest)WebRequest.Create(ConfigurationManager.AppSettings["ServerHost3"]);
             httpWebRequest.ContentType = "application/json";
             httpWebRequest.Method = "POST";
 
@@ -81,16 +110,16 @@ namespace TFSClientRestful
                 //int ppc = 0;
                 for (int pid = 0; pid < dtNumDetect; pid++)
                 {
-                    if ((dtClassList[pid] == 1) && (threshold <= dtScoreList[pid]))
+                    if (/*(dtClassList[pid] == 1) &&*/ (threshold <= dtScoreList[pid]))
                     {
                         pObj.NumOfDetect += 1;
                         //pObj.ScoreList.SetValue(dtScoreList[pid], ppc);
                         Boxes boxes = new Boxes();
                         var dtBoxesList = jobj["predictions"][0]["detection_boxes"][pid].Select(x => (float)x).ToArray();
-                        boxes.BoxX1 = dtBoxesList[0] * im_height; //p1_height
-                        boxes.BoxX2 = dtBoxesList[1] * im_width; //p1_width
-                        boxes.BoxY1 = dtBoxesList[2] * im_height; //p2_height
-                        boxes.BoxY2 = dtBoxesList[3] * im_width; //p2_width
+                        boxes.BoxY1 = dtBoxesList[0] * im_height; //p1_height
+                        boxes.BoxX1 = dtBoxesList[1] * im_width; //p1_width
+                        boxes.BoxY2 = dtBoxesList[2] * im_height; //p2_height
+                        boxes.BoxX2 = dtBoxesList[3] * im_width; //p2_width
                         pObj.BoxList.Add(boxes);
                         //ppc++;
                     }
