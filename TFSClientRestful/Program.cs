@@ -17,7 +17,7 @@ namespace TFSClientRestful
     {
         static void Main(string[] args)
         {
-            bool DEBUG_MODE = true;
+            bool DEBUG_MODE = false;
             //var testImage = new Bitmap("cat.jpg");
             //Image testImage = Image.FromFile("cat.jpg");
             //Bitmap testImage = (Bitmap)Image.FromFile("cat.jpg");             
@@ -55,9 +55,10 @@ namespace TFSClientRestful
 
             using (var streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
             {
-                NDArray bitmapBytes = GetBitmapBytes2NDArray(bImage);
+                /*NDArray bitmapBytes = GetBitmapBytes2NDArray(bImage);*/                
+                string bitmapBytes = GetBitmapBytes2String(bImage);
 
-                string json = "{\"instances\": " + bitmapBytes.ToString().Replace("\r\n", "") + "}";
+                string json = "{\"instances\": " + bitmapBytes + "}";
                 streamWriter.Write(json);
                 streamWriter.Flush();
                 streamWriter.Close();
@@ -172,7 +173,49 @@ namespace TFSClientRestful
             }
         }
 
-       
+        private static string GetBitmapBytes2String(Bitmap image)
+        {
+            if (image == null) throw new ArgumentNullException(nameof(image));
+
+            BitmapData bmpData = image.LockBits(new Rectangle(0, 0, image.Width, image.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppPArgb);
+            try
+            {
+                unsafe
+                {
+                    // Get the respective addresses                    
+                    byte* src = (byte*)bmpData.Scan0;
+                    int sizebytes = bmpData.Stride * bmpData.Height;
+                    int numBytes = bmpData.Width * bmpData.Height * 3;
+                    byte[] arrayData = new byte[numBytes];
+                    int width = bmpData.Width;
+                    int height = bmpData.Height;
+                    int idc = 0;
+                    string nDArray = null;
+                    string rowArray = null;
+                    string columArray = null;
+
+                    for (int h = 0; h < height; h++)
+                    {
+                        for (int w = 0; w < width * 3; w += 3)
+                        {
+                            string elem = String.Format("[{0}, {1}, {2}], ", src[idc + 2], src[idc + 1], src[idc]);
+                            rowArray += elem;
+                            idc += 4;
+                        }
+                        columArray += String.Format("[{0}], ", rowArray.Substring(0, rowArray.Length - 2));
+                        rowArray = "";
+                    }
+                    nDArray = String.Format("[[{0}]]", columArray.Substring(0, columArray.Length - 2));
+
+                    return nDArray;
+                }
+            }
+            finally
+            {
+                image.UnlockBits(bmpData);
+            }
+        }
+
 
     }
 
